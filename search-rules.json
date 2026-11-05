@@ -1,206 +1,151 @@
 {
+  "options": {
+    "hideNames": ["archived products"],
+    "ignoreWords": ["x"],
+    "fallbackToFullTitle": true,
+    "autoCorrect": true,
+    "partialMatch": true,
+    "maxChips": 14,
+    "chipStopwords": []
+  },
   "aliases": {
-    "insert": [
-      "knurl"
-    ],
-    "nut": [
-      "knurl"
-    ],
-    "knurl": [
-      "insert",
-      "nut"
-    ],
-    "headless": [
-      "tanam"
-    ],
-    "tanam": [
-      "headless"
-    ],
-    "coupling": [
-      "kopling"
-    ],
-    "kopling": [
-      "coupling"
-    ],
-    "rubber": [
-      "karet"
-    ],
-    "karet": [
-      "rubber"
-    ],
-    "din": [
-      "verseng"
-    ],
-    "countersunk": [
-      "verseng"
-    ],
-    "counter": [
-      "verseng"
-    ],
-    "round": [
-      "button"
-    ],
-    "kancing": [
-      "button"
-    ],
-    "wire": [
-      "braided",
-      "sleeve"
-    ],
-    "elemen": [
-      "heater"
-    ],
-    "pemanas": [
-      "heater"
-    ]
+    "insert": ["knurl"],
+    "nut": ["knurl", "mur"],
+    "knurl": ["insert nut"],
+    "headless": ["tanam"],
+    "tanam": ["headless"],
+    "coupling": ["kopling"],
+    "kopling": ["coupling"],
+    "rubber": ["karet"],
+    "karet": ["rubber"],
+    "din": ["verseng"],
+    "countersunk": ["verseng"],
+    "counter": ["verseng"],
+    "round": ["button"],
+    "kancing": ["button"],
+    "wire": ["braided", "sleeve"],
+    "elemen": ["heater"],
+    "pemanas": ["heater"],
+
+    "bolt": ["baut"],
+    "screw": ["baut", "sekrup"],
+    "cable": ["kabel"],
+    "wrench": ["kunci"],
+    "kunci": ["wrench"],
+    "screwdriver": ["obeng"],
+    "obeng": ["screwdriver"],
+    "drill": ["bor"],
+    "drill bit": ["mata bor"],
+    "sandpaper": ["amplas"],
+    "lamp": ["lampu"],
+    "light": ["lampu"],
+    "holder": ["dudukan"],
+    "dudukan": ["holder"],
+    "mount": ["dudukan"],
+    "fan": ["kipas"],
+    "kipas": ["fan"],
+    "laher": ["bearing"],
+    "bantalan": ["bearing"],
+    "puli": ["pulley"],
+    "gt2": ["2gt"],
+    "2gt": ["gt2"],
+    "heat shrink": ["selongsong bakar"],
+    "shrink": ["selongsong"],
+    "washer": ["ring"],
+    "spring washer": ["ring per"],
+    "t nut": ["sliding nut"],
+    "tnut": ["sliding nut"],
+    "mesh": ["braided sleeve"],
+
+    "aluminium": ["aluminum", "alumunium"],
+    "aluminum": ["alumunium"],
+    "alumunium": ["aluminum"],
+    "profil": ["profile"],
+    "profile": ["profil"],
+
+    "black": ["hitam"],
+    "white": ["putih"],
+    "red": ["merah"],
+    "merah": ["red"],
+    "green": ["hijau"],
+    "yellow": ["kuning"],
+    "blue": ["biru"],
+    "biru": ["blue"],
+    "grey": ["abu"],
+    "gray": ["abu"]
   },
   "categories": {
     "pulley": {
-      "keywords": [
-        "pulley",
-        "timing pulley"
-      ],
+      "keywords": ["pulley", "puli", "timing pulley"],
       "series": {
-        "gt2": [
-          "gt2",
-          "2gt"
-        ]
+        "gt2": ["gt2", "2gt"],
+        "htd3m": ["htd3m"],
+        "mxl": ["mxl"]
       },
-      "variant1": [
-        "20t",
-        "30t",
-        "40t"
-      ],
-      "variant2": [
-        "5mm",
-        "6mm",
-        "8mm"
-      ],
+      "variant1": ["20t", "30t", "40t"],
+      "variant2": ["5mm", "6mm", "8mm"],
       "variant3": []
     },
     "corner": {
-      "keywords": [
-        "corner",
-        "bracket",
-        "siku"
-      ],
+      "keywords": ["corner", "bracket", "siku"],
       "series": {},
-      "variant1": [
-        "2020",
-        "3030"
-      ],
+      "variant1": ["2020", "3030"],
       "variant2": [],
       "variant3": []
     },
     "coupling": {
-      "keywords": [
-        "flexible"
-      ],
-      "series": {},
+      "keywords": ["coupling", "kopling", "flexible"],
+      "series": {
+        "flexible": ["flexible"],
+        "rubber": ["rubber", "karet"],
+        "brass": ["brass"],
+        "blue": ["blue", "biru"]
+      },
       "variant1": [],
       "variant2": [],
       "variant3": []
     },
     "profile aluminium": {
-      "keywords": [
-        "extrusion",
-        "profile",
-        "aluminium"
-      ],
+      "keywords": ["extrusion", "profile", "profil", "aluminium", "aluminum", "alumunium"],
       "series": {},
-      "variant1": [
-        "2020"
-      ],
+      "variant1": ["2020", "3030", "4040"],
       "variant2": [],
       "variant3": []
     },
     "t nut": {
-      "keywords": [
-        "t nut",
-        "M"
-      ],
+      "keywords": ["t nut", "tnut", "sliding nut"],
       "series": {},
       "variant1": [],
       "variant2": [],
       "variant3": []
     },
     "wiremesh": {
-      "keywords": [
-        "sleeve",
-        "braid",
-        "mesh"
-      ],
+      "keywords": ["sleeve", "braid", "braided", "mesh"],
       "series": {},
       "variant1": [],
       "variant2": [],
       "variant3": []
     },
     "Socket": {
-      "keywords": [
-        "socket"
-      ],
+      "keywords": ["socket"],
       "series": {},
-      "variant1": [
-        "head"
-      ],
+      "variant1": ["head"],
       "variant2": [],
       "variant3": []
     },
     "ballnose": {
-      "keywords": [
-        "ballnose",
-        "straight bit",
-        "spiral end"
-      ],
+      "keywords": ["ballnose", "straight bit", "spiral end"],
       "series": {},
       "variant1": [],
       "variant2": [],
       "variant3": []
     },
     "mur": {
-      "keywords": [
-        "mur",
-        "locknut"
-      ],
+      "keywords": ["mur", "locknut"],
       "series": {},
-      "variant1": [
-        "nut"
-      ],
+      "variant1": ["nut"],
       "variant2": [],
       "variant3": []
-    }
-  },
-  "search": {
-    "searchFields": [
-      "nama pendek"
-    ],
-    "ranking": {
-      "exactName": 1000,
-      "phraseMatch": 260,
-      "exactToken": 100,
-      "allTokensBonus": 180,
-      "prefixMatch": 48,
-      "typoMatch": 24,
-      "technicalDimensionMatch": 900
-    },
-    "dimensionMatching": {
-      "enabled": true,
-      "metricBolt": {
-        "threadFormat": "M<number>",
-        "lengthUnit": "mm",
-        "requireProductFamily": "baut",
-        "threadAndLengthOrderSensitive": true
-      },
-      "coupling": {
-        "unit": "mm",
-        "dimensionOrderIndependent": true,
-        "requireAllDimensions": true
-      }
-    },
-    "typoTolerance": {
-      "enabled": true,
-      "maxDistance": 1,
-      "minimumTokenLength": 4
     }
   }
 }
