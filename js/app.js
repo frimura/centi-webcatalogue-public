@@ -2,6 +2,31 @@
 const CONFIG={spreadsheetId:'1wTJRGfmdAARp9d_qNNQ1UUUssuNo5p9tarxPiYllGLo',gid:'0',currency:'IDR',cacheKey:'centi_catalog_rows_v1',cartKey:'centi_catalog_cart_v1',settingsKey:'centi_catalog_settings_v1'};
 const $=id=>document.getElementById(id);
 let products=[],cart=JSON.parse(localStorage.getItem(CONFIG.cartKey)||'{}'),settings=JSON.parse(localStorage.getItem(CONFIG.settingsKey)||'{}'),toastTimer;
+
+// ================= SEARCH RULES =================
+
+let SEARCH_RULES = {
+  aliases: {},
+  categories: {}
+};
+
+async function loadSearchRules() {
+  try {
+    const response = await fetch('./search-rules.json');
+
+    if (!response.ok) {
+      throw new Error('Could not load search-rules.json');
+    }
+
+    SEARCH_RULES = await response.json();
+
+    console.log('Search rules loaded:', SEARCH_RULES);
+
+  } catch (error) {
+    console.error('Search rules error:', error);
+  }
+}
+
 const csvUrl=`https://docs.google.com/spreadsheets/d/${CONFIG.spreadsheetId}/export?format=csv&gid=${CONFIG.gid}`;
 function money(v){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0)}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -9,7 +34,182 @@ function parseCSV(text){const rows=[];let row=[],cell='',quoted=false;for(let i=
 function normalize(rows){if(!rows.length)return[];const headers=rows[0].map(x=>x.trim().toLowerCase());const idx=name=>headers.indexOf(name.toLowerCase());const sku=idx('sku'),short=idx('nama pendek'),img=idx('images'),notes=idx('notes'),price=idx('regular price'),name=idx('name'),variation=idx('variation');if(sku<0||price<0)throw new Error('Required columns SKU and regular price were not found.');return rows.slice(1).map(r=>({sku:String(r[sku]||'').trim(),short:String(r[short]||'').trim(),image:String(r[img]||'').trim(),notes:String(r[notes]||'').trim(),price:Number(String(r[price]||'').replace(/[^0-9.-]/g,''))||0,name:String(r[name]||'').trim(),variation:String(r[variation]||'').trim()})).filter(p=>p.sku)}
 function jsonp(url,timeoutMs=30000){return new Promise((resolve,reject)=>{const cb='centiJsonp_'+Date.now()+'_'+Math.floor(Math.random()*1e6);const script=document.createElement('script');let timer=setTimeout(()=>finish(new Error('Request timed out')),timeoutMs);function finish(err,data){clearTimeout(timer);delete window[cb];script.remove();err?reject(err):resolve(data)}window[cb]=data=>finish(null,data);script.onerror=()=>finish(new Error('Could not reach Apps Script'));script.src=url+(url.includes('?')?'&':'?')+'callback='+cb;document.head.appendChild(script)})}
 async function loadCatalog(force=false){$('status').textContent='Connecting to Google Sheets…';$('status').classList.remove('error');$('refreshBtn').disabled=true;try{let rows;if(!force){const cached=localStorage.getItem(CONFIG.cacheKey);if(cached){try{rows=JSON.parse(cached)}catch{}}}if(!rows){let loadError;try{const res=await fetch(csvUrl,{cache:'no-store'});if(!res.ok)throw new Error(`Google Sheets returned HTTP ${res.status}`);const text=await res.text();rows=normalize(parseCSV(text));if(!rows.length)throw new Error('CSV export returned no product rows')}catch(e){loadError=e;if(settings.scriptUrl){const data=await jsonp(settings.scriptUrl+'?action=catalog');if(!data.ok)throw new Error(data.error||'Apps Script catalog request failed');rows=data.rows||[]}else throw e}if(!rows.length)throw new Error('No products found. Check sheet access and gid=0.');localStorage.setItem(CONFIG.cacheKey,JSON.stringify(rows));}products=rows;$('status').textContent=`${products.length.toLocaleString('id-ID')} products loaded${navigator.onLine?'':' · offline cache'}`;renderProducts()}catch(err){const cached=localStorage.getItem(CONFIG.cacheKey);if(cached){products=JSON.parse(cached);$('status').textContent=`Using saved catalog (${products.length.toLocaleString('id-ID')} products). Refresh failed: ${err.message}`;$('status').classList.add('error');renderProducts()}else{$('status').textContent=`Could not load catalog: ${err.message}`;$('status').classList.add('error');$('resultCount').textContent='Catalog unavailable'}}finally{$('refreshBtn').disabled=false}}
-function renderProducts(){const q=$('searchInput').value.trim().toLowerCase();const list=q?products.filter(p=>[p.sku,p.short,p.name,p.variation,p.notes].join(' ').toLowerCase().includes(q)):products.slice(0,80);$('resultCount').textContent=q?`${list.length.toLocaleString('id-ID')} matching products`:`Showing first ${list.length} of ${products.length.toLocaleString('id-ID')} products`;const host=$('productList');host.innerHTML=list.slice(0,160).map(p=>`<article class="product-card"><div class="media">${p.image?`<img class="product-image" src="${esc(p.image)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;image-placeholder&quot;>▧</div>'">`:`<div class="image-placeholder">▧</div>`}</div><div class="product-info"><div class="product-name">${esc(p.short||p.name||p.sku)}</div><div class="product-sku">SKU: ${esc(p.sku)}</div><div class="product-variation">${esc(p.variation||p.notes||'')}</div><div class="product-price">${money(p.price)}</div><button class="add-button" data-add="${esc(p.sku)}">＋ Add to cart</button></div></article>`).join('');$('emptyState').classList.toggle('hidden',list.length!==0);if(list.length>160)$('status').textContent='Showing first 160 matches. Refine your search to narrow results.';host.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>addToCart(b.dataset.add)))}
+// ================= SEARCH ENGINE =================
+
+function normalizeSearch(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/gt\s*(\d+)/g, '$1gt')
+    .replace(/(\d+)\s*gt/g, '$1gt')
+    .replace(/m\s+(\d+(?:\.\d+)?)/g, 'm$1')
+    .replace(/(\d+(?:\.\d+)?)\s*mm/g, '$1mm')
+    .replace(/[^a-z0-9.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getSearchAlternatives(token) {
+  const alternatives = [token];
+  const aliases = SEARCH_RULES.aliases || {};
+
+  if (aliases[token]) {
+    alternatives.push(...aliases[token]);
+  }
+
+  return alternatives.map(normalizeSearch);
+}
+
+function searchProducts(query) {
+  const normalizedQuery = normalizeSearch(query);
+
+  if (!normalizedQuery) {
+    return products.slice(0, 80);
+  }
+
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+  const categories = SEARCH_RULES.categories || {};
+
+  return products.map(product => {
+
+    // ONLY Nama Pendek is used for searching.
+    const name = normalizeSearch(product.short);
+
+    if (!name) return null;
+
+    const nameTokens = name.split(' ');
+    let score = 0;
+    let matchedTokens = 0;
+
+    // Exact Nama Pendek match
+    if (name === normalizedQuery) {
+      score += 500;
+    }
+
+    // Exact phrase match
+    if (name.includes(normalizedQuery)) {
+      score += 200;
+    }
+
+    // Match each search word or its existing aliases
+    queryTokens.forEach(token => {
+      const alternatives = getSearchAlternatives(token);
+
+      const exactMatch = alternatives.some(alias =>
+        nameTokens.includes(alias)
+      );
+
+      const partialMatch = alternatives.some(alias =>
+        nameTokens.some(word => word.startsWith(alias))
+      );
+
+      if (exactMatch) {
+        score += 40;
+        matchedTokens++;
+      } else if (partialMatch) {
+        score += 15;
+        matchedTokens++;
+      }
+    });
+
+    // Reward products matching every search word
+    if (matchedTokens === queryTokens.length) {
+      score += 100;
+    }
+
+    // Apply existing category, series and variant rules
+    for (const rule of Object.values(categories)) {
+
+      const keywordMatch = (rule.keywords || []).some(keyword =>
+        normalizedQuery.includes(normalizeSearch(keyword)) &&
+        name.includes(normalizeSearch(keyword))
+      );
+
+      if (keywordMatch) {
+        score += 50;
+      }
+
+      for (const values of Object.values(rule.series || {})) {
+        if (values.some(value =>
+          normalizedQuery.includes(normalizeSearch(value)) &&
+          name.includes(normalizeSearch(value))
+        )) {
+          score += 30;
+        }
+      }
+
+      ['variant1', 'variant2', 'variant3'].forEach(key => {
+        if ((rule[key] || []).some(value =>
+          normalizedQuery.includes(normalizeSearch(value)) &&
+          name.includes(normalizeSearch(value))
+        )) {
+          score += 20;
+        }
+      });
+    }
+
+    if (matchedTokens === 0 && score === 0) {
+      return null;
+    }
+
+    return {
+      ...product,
+      searchScore: score
+    };
+
+  })
+  .filter(Boolean)
+  .sort((a, b) => b.searchScore - a.searchScore);
+}
+
+// ================= PRODUCT RENDER =================
+
+function renderProducts() {
+  const query = $('searchInput').value.trim();
+  const list = searchProducts(query);
+
+  $('resultCount').textContent = query
+    ? `${list.length.toLocaleString('id-ID')} matching products`
+    : `Showing first ${list.length.toLocaleString('id-ID')} products`;
+
+  const host = $('productList');
+
+  host.innerHTML = list.slice(0, 160).map(p => `
+    <article class="product-card">
+      <div class="media">
+        ${p.image
+          ? `<img class="product-image" src="${esc(p.image)}"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              onerror="this.outerHTML='<div class=&quot;image-placeholder&quot;>▧</div>'">`
+          : `<div class="image-placeholder">▧</div>`}
+      </div>
+
+      <div class="product-info">
+        <div class="product-name">${esc(p.short || p.sku)}</div>
+        <div class="product-sku">SKU: ${esc(p.sku)}</div>
+        <div class="product-variation">${esc(p.variation || p.notes || '')}</div>
+        <div class="product-price">${money(p.price)}</div>
+
+        <button class="add-button" data-add="${esc(p.sku)}">
+          ＋ Add to cart
+        </button>
+      </div>
+    </article>
+  `).join('');
+
+  $('emptyState').classList.toggle('hidden', list.length !== 0);
+
+  if (list.length > 160) {
+    $('status').textContent =
+      'Showing first 160 matches. Refine your search to narrow results.';
+  }
+
+  host.querySelectorAll('[data-add]').forEach(button => {
+    button.addEventListener('click', () => {
+      addToCart(button.dataset.add);
+    });
+  });
+}
 function addToCart(sku){const p=products.find(x=>x.sku===sku);if(!p)return;cart[sku]??={sku:p.sku,name:p.short||p.name,price:p.price,qty:0};cart[sku].qty++;saveCart();showToast('Added to cart')}
 function saveCart(){localStorage.setItem(CONFIG.cartKey,JSON.stringify(cart));updateCartBadge();renderCart()}
 function cartValues(){return Object.values(cart).filter(x=>x.qty>0)}
@@ -25,5 +225,15 @@ function openSettings(){$('settingsOverlay').classList.remove('hidden');$('setti
 function closeSettings(){$('settingsOverlay').classList.add('hidden');$('settingsPanel').classList.add('hidden')}
 function showToast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600)}
 $('searchInput').addEventListener('input',renderProducts);$('clearSearch').onclick=()=>{$('searchInput').value='';renderProducts();$('searchInput').focus()};$('refreshBtn').onclick=()=>loadCatalog(true);$('cartTop').onclick=openCart;$('navCart').onclick=openCart;$('navCatalog').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});$('closeCart').onclick=closeCart;$('cartOverlay').onclick=closeCart;$('sendOrder').onclick=sendOrder;$('copyOrder').onclick=copyOrder;$('settingsButton').onclick=openSettings;$('closeSettings').onclick=closeSettings;$('settingsOverlay').onclick=closeSettings;$('saveSettings').onclick=()=>{settings={scriptUrl:$('scriptUrl').value.trim(),pin:$('orderPin').value.trim()};localStorage.setItem(CONFIG.settingsKey,JSON.stringify(settings));closeSettings();showToast('Settings saved')};
-updateCartBadge();renderCart();loadCatalog();
-if('serviceWorker'in navigator&&location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+updateCartBadge();
+renderCart();
+
+loadSearchRules().then(() => {
+  loadCatalog();
+});
+
+if('serviceWorker'in navigator&&location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
