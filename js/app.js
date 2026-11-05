@@ -346,13 +346,18 @@ async function loadCatalog(force = false) {
    6. SEARCH ENGINE
 ========================================================= */
 
+
+/* =========================================================
+   6. SEARCH ENGINE
+========================================================= */
+
 function normalizeSearch(text) {
     return String(text || '')
         .toLowerCase()
+        .replace(/×/g, 'x')
         .replace(/gt\s*(\d+)/g, '$1gt')
-        .replace(/(\d+)\s*gt/g, '$1gt')
         .replace(/m\s+(\d+(?:\.\d+)?)/g, 'm$1')
-        .replace(/(\d+(?:\.\d+)?)\s*mm/g, '$1mm')
+        .replace(/(\d+(?:\.\d+)?)\s*mm\b/g, '$1mm')
         .replace(/[^a-z0-9.]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -360,14 +365,92 @@ function normalizeSearch(text) {
 
 
 function getSearchAlternatives(token) {
-    const alternatives = [token];
     const aliases = SEARCH_RULES.aliases || {};
+    const alternatives = [token];
 
     if (aliases[token]) {
         alternatives.push(...aliases[token]);
     }
 
-    return alternatives.map(normalizeSearch);
+    return [...new Set(alternatives.map(normalizeSearch))];
+}
+
+
+function getThreadSize(text) {
+    const match = normalizeSearch(text).match(/\bm(\d+(?:\.\d+)?)/);
+    return match ? match[1] : null;
+}
+
+
+function getDimensions(text, allowBareNumbers = false) {
+    const normalized = normalizeSearch(text);
+    const dimensions = [];
+
+    // Find dimensions written with mm.
+    const mmMatches = normalized.matchAll(
+        /(\d+(?:\.\d+)?)mm\b/g
+    );
+
+    for (const match of mmMatches) {
+        dimensions.push(Number(match[1]));
+    }
+
+    if (allowBareNumbers) {
+        const tokens = normalized.split(' ');
+
+        for (const token of tokens) {
+            // Ignore thread sizes such as M3.
+            if (/^m\d+(?:\.\d+)?$/.test(token)) continue;
+
+            // Accept standalone numbers such as 8 or 10.
+            if (/^\d+(?:\.\d+)?$/.test(token)) {
+                dimensions.push(Number(token));
+            }
+        }
+    }
+
+    return dimensions;
+}
+
+
+function sameDimensions(first, second) {
+    if (first.length !== second.length) return false;
+
+    const a = [...first].sort((x, y) => x - y);
+    const b = [...second].sort((x, y) => x - y);
+
+    return a.every((value, index) => value === b[index]);
+}
+
+
+function levenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+
+    const previous = Array.from(
+        { length: b.length + 1 },
+        (_, index) => index
+    );
+
+    for (let i = 1; i <= a.length; i++) {
+        let diagonal = previous[0];
+        previous[0] = i;
+
+        for (let j = 1; j <= b.length; j++) {
+            const above = previous[j];
+
+            previous[j] = Math.min(
+                previous[j] + 1,
+                previous[j - 1] + 1,
+                diagonal + (a[i - 1] === b[j - 1] ? 0 : 1)
+            );
+
+            diagonal = above;
+        }
+    }
+
+    return previous[b.length];
 }
 
 
@@ -382,32 +465,61 @@ function searchProducts(query) {
         .split(' ')
         .filter(Boolean);
 
+    const threadSize = getThreadSize(normalizedQuery);
+
+    // Numbers belonging to the search dimensions.
+    const queryDimensions = getDimensions(
+        normalizedQuery,
+        true
+    );
+
+    // Remove the thread number from the dimension list.
+    const dimensions = threadSize
+        ? queryDimensions.filter(value => value !== Number(threadSize))
+        : queryDimensions;
+
+    const hasDimensionSearch = dimensions.length > 0;
+
+    const isMetricBoltSearch =
+        Boolean(threadSize) &&
+        dimensions.length > 0;
+
     const categories = SEARCH_RULES.categories || {};
 
     return products
         .map(product => {
-            // ONLY Nama Pendek is used for searching.
+            // IMPORTANT: Only Nama Pendek is used for matching.
             const name = normalizeSearch(product.short);
 
             if (!name) return null;
 
             const nameTokens = name.split(' ');
+            const productThread = getThreadSize(name);
+            const productDimensions = getDimensions(name);
 
             let score = 0;
             let matchedTokens = 0;
 
-            // Exact Nama Pendek match
+            // Exact name match.
             if (name === normalizedQuery) {
                 score += 500;
             }
 
-            // Exact phrase match
+            // Exact phrase match.
             if (name.includes(normalizedQuery)) {
                 score += 200;
             }
 
-            // Match each search word or existing aliases
-            queryTokens.forEach(token => {
+            // Match normal search words and aliases.
+            for (const token of queryTokens) {
+                // Numeric dimensions are handled separately.
+                if (
+                    /^\d+(?:\.\d+)?$/.test(token) ||
+                    /^\d+(?:\.\d+)?mm$/.test(token)
+                ) {
+                    continue;
+                }
+
                 const alternatives = getSearchAlternatives(token);
 
                 const exactMatch = alternatives.some(alias =>
@@ -421,46 +533,106 @@ function searchProducts(query) {
                 if (exactMatch) {
                     score += 40;
                     matchedTokens++;
+                    continue;
+                }
 
-                } else if (partialMatch) {
+                if (partialMatch) {
                     score += 15;
                     matchedTokens++;
+                    continue;
                 }
-            });
 
-            // Reward products matching every search word
-            if (matchedTokens === queryTokens.length) {
+                // Small typo tolerance for words of 5+ characters.
+                if (token.length >= 5) {
+                    const typoMatch = nameTokens.some(word =>
+                        word.length >= 4 &&
+                        levenshtein(token, word) <= 1
+                    );
+
+                    if (typoMatch) {
+                        score += 10;
+                        matchedTokens++;
+                    }
+                }
+            }
+
+            // Reward products matching every search word.
+            const searchableTokenCount = queryTokens.filter(token =>
+                !/^\d+(?:\.\d+)?$/.test(token) &&
+                !/^\d+(?:\.\d+)?mm$/.test(token)
+            ).length;
+
+            if (
+                searchableTokenCount > 0 &&
+                matchedTokens === searchableTokenCount
+            ) {
                 score += 100;
             }
 
-            // Apply existing category, series and variant rules
-            for (const rule of Object.values(categories)) {
+            // Metric bolt matching: M3 x 10, M3 10mm, etc.
+            if (isMetricBoltSearch) {
+                const isBaut = name.includes('baut');
 
-                const keywordMatch = (rule.keywords || []).some(keyword =>
-                    normalizedQuery.includes(normalizeSearch(keyword)) &&
-                    name.includes(normalizeSearch(keyword))
-                );
+                if (
+                    !isBaut ||
+                    productThread !== threadSize ||
+                    !sameDimensions(dimensions, productDimensions)
+                ) {
+                    return null;
+                }
+
+                score += 250;
+            }
+
+            // General dimension matching.
+            // Dimension order does not matter.
+            else if (hasDimensionSearch) {
+                if (!sameDimensions(dimensions, productDimensions)) {
+                    return null;
+                }
+
+                score += 150;
+            }
+
+            // Apply existing category, series and variant rules.
+            for (const rule of Object.values(categories)) {
+                const keywordMatch = (rule.keywords || []).some(keyword => {
+                    const normalizedKeyword = normalizeSearch(keyword);
+
+                    return (
+                        normalizedQuery.includes(normalizedKeyword) &&
+                        name.includes(normalizedKeyword)
+                    );
+                });
 
                 if (keywordMatch) {
                     score += 50;
                 }
 
-                // Series matching
+                // Series matching.
                 for (const values of Object.values(rule.series || {})) {
-                    if (values.some(value =>
-                        normalizedQuery.includes(normalizeSearch(value)) &&
-                        name.includes(normalizeSearch(value))
-                    )) {
+                    if (values.some(value => {
+                        const normalizedValue = normalizeSearch(value);
+
+                        return (
+                            normalizedQuery.includes(normalizedValue) &&
+                            name.includes(normalizedValue)
+                        );
+                    })) {
                         score += 30;
                     }
                 }
 
-                // Variant matching
+                // Variant matching.
                 ['variant1', 'variant2', 'variant3'].forEach(key => {
-                    if ((rule[key] || []).some(value =>
-                        normalizedQuery.includes(normalizeSearch(value)) &&
-                        name.includes(normalizeSearch(value))
-                    )) {
+                    if ((rule[key] || []).some(value => {
+                        const normalizedValue = normalizeSearch(value);
+
+                        return (
+                            normalizedQuery.includes(normalizedValue) &&
+                            name.includes(normalizedValue)
+                        );
+                    })) {
                         score += 20;
                     }
                 });
@@ -478,6 +650,7 @@ function searchProducts(query) {
         .filter(Boolean)
         .sort((a, b) => b.searchScore - a.searchScore);
 }
+
 
 
 /* =========================================================
