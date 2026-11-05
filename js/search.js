@@ -5,11 +5,13 @@
  * What it does
  *   - searches the "Nama Pendek" title (+ SKU); long marketplace titles are only
  *     used as a fallback when the short title has no match
- *   - every word must match, in any order:  "m3 8 baut"  finds  "Baut Button M3 x 8mm"
+ *   - relevance-ranked search: partial matches remain visible instead of being discarded
+ *   - uses Code Categorizing cluster codes to prioritize products in the requested category
+ *   - dimensions are normalized across M3x10 / M3 x 10 / M3 10 / M3 10mm
  *   - understands sizes:  m3x8, m3 x 8, "8" -> 8mm, "6,35" -> 6.35mm, "20 t" -> 20t
  *   - uses aliases / phrase aliases from search-rules.json (English <-> Indonesian etc.)
  *   - fixes typos against the words that really exist in your catalog (puley -> pulley)
- *   - ranks results (exact word > size match > prefix > alias), natural-sorts ties
+ *   - ranks exact terms and dimensions first, then close matches and category matches
  *   - suggests "narrow down" chips, pinned ones coming from the categories in the rules file
  */
 (function (root, factory) {
@@ -233,28 +235,128 @@
     return { s: best, pos: bestPos };
   }
 
-  function runPass(groups, field, minGroups) {
+
+  // Category codes come from the catalog's "Code Categorizing" column.
+  // The first letter is the cluster; E is the coupling cluster.
+  const CATEGORY_PREFIXES = {
+    pulley: ['C'],              // Linear Motion
+    corner: ['B'],              // Mechanical Structure
+    coupling: ['E'],            // Couplings
+    'profile aluminium': ['B'],
+    't nut': ['A'],             // T-nuts are grouped with bolts/nuts in this catalog
+    wiremesh: ['F'],            // Mechanical Accessories
+    Socket: ['A'],
+    ballnose: ['G'],            // CNC Parts
+    mur: ['A']
+  };
+
+  function detectedCategories(tokens) {
+    const found = [];
+    const q = new Set(tokens);
+    for (const [name, cat] of Object.entries(rules.categories)) {
+      const keys = [name].concat(cat.keywords || []);
+      const hit = keys.some(key => {
+        const parts = tokenize(key);
+        return parts.length && parts.every(t => q.has(t) ||
+          (aliasMap.get(t) || []).some(a => a.length === 1 && q.has(a[0])));
+      });
+      if (hit) found.push(name);
+    }
+    return found;
+  }
+
+
+  function dimensionMatchCount(queryTokens, view) {
+    const wanted = queryTokens.map(parseNum).filter(Boolean);
+    if (!wanted.length) return { matched: 0, exact: 0 };
+    const available = view.tok.map((t, i) => ({ n: view.num[i], used: false }))
+      .filter(x => x.n);
+    let matched = 0, exact = 0;
+    for (const q of wanted) {
+      let at = available.findIndex(x => !x.used && x.n.num === q.num && x.n.unit === q.unit);
+      if (at >= 0) {
+        available[at].used = true; matched++; exact++; continue;
+      }
+      // A bare number (e.g. 10) may match a dimensional token (10mm).
+      if (q.unit === '') {
+        at = available.findIndex(x => !x.used && x.n.num === q.num);
+        if (at >= 0) { available[at].used = true; matched++; }
+      }
+    }
+    return { matched, exact };
+  }
+
+  function runRanked(groups, tokens) {
     allowPrefix1 = groups.length === 1;
+    const cats = detectedCategories(tokens);
+    const prefixes = cats.flatMap(c => CATEGORY_PREFIXES[c] || []);
     const out = [];
+
     for (const d of docs) {
       if (hideSet.has(d.key)) continue;
-      const view = field === 'full' ? d.full : d.main;
-      let total = 0, matched = 0, bonus = 0, prev = -9;
+
+      let total = 0, matched = 0, mainMatched = 0, fullMatched = 0;
+      let exactDimensions = 0, partialDimensions = 0, bonus = 0, prev = -9;
+
       for (let g = 0; g < groups.length; g++) {
-        const r = scoreGroup(groups[g], view);
+        const main = scoreGroup(groups[g], d.main);
+        const full = scoreGroup(groups[g], d.full);
+        const r = main.s >= full.s ? main : full;
         if (r.s > 0) {
-          matched++; total += r.s;
-          if (field === 'main') {
-            if (r.pos === prev + 1) bonus += 12;           // words next to each other, in order
-            if (g === 0 && r.pos === 0) bonus += 20;       // title starts with the first word
+          matched++;
+          total += r.s;
+          if (main.s > 0) mainMatched++;
+          else fullMatched++;
+          const queryHasNumber = groups[g].alts.some(a => a.toks.some(t => !!t.n));
+          if (queryHasNumber) {
+            if (r.s >= 95) exactDimensions++;
+            else partialDimensions++;
           }
+          if (r.pos === prev + 1) bonus += 10;
+          if (g === 0 && r.pos === 0 && main.s > 0) bonus += 18;
           prev = r.pos;
-        } else prev = -9;
+        } else {
+          prev = -9;
+        }
       }
-      if (matched === 0 || matched < minGroups) continue;
-      out.push({ d, score: total + bonus + matched * 50 - view.tok.length * 0.5 });
+
+      // Dimension ranking is based on the short/catalog title, not the long
+      // marketplace title which may list many unrelated variation sizes.
+      const dimensionFit = dimensionMatchCount(tokens, d.main);
+
+      const code = String(d.p.category || '').trim().toUpperCase();
+      const categoryMatch = prefixes.some(prefix => code.startsWith(prefix));
+      // Keep every item in a requested category, even if its title has no
+      // matching dimensions or wording. Text/dimension matches rank within it.
+      if (!matched && !categoryMatch) continue;
+
+      const coverage = matched / Math.max(1, groups.length);
+      let score = total + bonus + matched * 38;
+      score += coverage * 100;
+      score += mainMatched * 12;
+      score -= fullMatched * 3;
+      score += exactDimensions * 32 + partialDimensions * 8;
+      if (categoryMatch) score += 420;
+      if (matched === groups.length) score += 90;
+      if (matched === 0 && categoryMatch) score += 0;
+
+      out.push({
+        d, score, matched, coverage, categoryMatch,
+        exactDimensions, partialDimensions,
+        dimensionMatches: dimensionFit.matched, dimensionExact: dimensionFit.exact,
+        rank: matched === groups.length ? 'strong' : (matched ? 'related' : 'category')
+      });
     }
-    out.sort((a, b) => (b.score - a.score) || collator.compare(a.d.title, b.d.title) || (a.d.i - b.d.i));
+
+    out.sort((a, b) =>
+      (Number(b.categoryMatch) - Number(a.categoryMatch)) ||
+      (b.dimensionMatches - a.dimensionMatches) ||
+      (b.dimensionExact - a.dimensionExact) ||
+      (b.score - a.score) ||
+      (b.matched - a.matched) ||
+      collator.compare(a.d.title, b.d.title) ||
+      (a.d.i - b.d.i)
+    );
     return out;
   }
 
@@ -309,16 +411,23 @@
 
   /* ----------------------------------------------------------------- search */
 
+
   function pack(hits, mode, groups, tokens, corrected) {
     const skip = new Set();
     for (const g of groups) for (const a of g.alts) for (const q of a.toks) skip.add(q.t);
     return {
       items: hits.map(h => h.d.p),
       total: hits.length,
-      mode,                       // exact | full | corrected | partial | sku | none
+      mode,
       corrected: corrected || null,
       words: tokens,
-      skip
+      skip,
+      ranking: hits.map(h => ({
+        sku: h.d.sku, score: Math.round(h.score),
+        matched: h.matched, categoryMatch: h.categoryMatch,
+        dimensionMatches: h.dimensionMatches,
+        rank: h.rank
+      }))
     };
   }
 
@@ -326,58 +435,49 @@
     const raw = String(query || '').trim();
     const rawKey = raw.toLowerCase();
 
-    // 1) SKU typed or pasted
+    // Exact SKU and SKU-prefix searches retain their dedicated behavior.
     if (rawKey && /^[a-z0-9.]+$/.test(rawKey)) {
       const exact = docs.filter(d => d.sku === rawKey);
       const pref = rawKey.length >= 6 && /\d/.test(rawKey)
         ? docs.filter(d => d.sku !== rawKey && d.sku.startsWith(rawKey)) : [];
       if (exact.length || pref.length) {
-        return { items: exact.concat(pref).map(d => d.p), total: exact.length + pref.length,
-          mode: 'sku', corrected: null, words: [rawKey], skip: new Set([rawKey]) };
+        return {
+          items: exact.concat(pref).map(d => d.p),
+          total: exact.length + pref.length,
+          mode: 'sku', corrected: null, words: [rawKey],
+          skip: new Set([rawKey])
+        };
       }
     }
 
     let tokens = tokenize(raw);
     const kept = tokens.filter(t => !ignoreSet.has(t));
     if (kept.length) tokens = kept;
-    if (!tokens.length) return { items: [], total: 0, mode: 'none', corrected: null, words: [], skip: new Set() };
-
-    const opt = rules.options;
-    const both = (groups) => {
-      let hits = runPass(groups, 'main', groups.length);
-      if (hits.length) return { hits, mode: 'exact' };
-      if (opt.fallbackToFullTitle) {
-        hits = runPass(groups, 'full', groups.length);
-        if (hits.length) return { hits, mode: 'full' };
-      }
-      return null;
+    if (!tokens.length) return {
+      items: [], total: 0, mode: 'none', corrected: null,
+      words: [], skip: new Set()
     };
 
-    // 2) every word must match (short title first, then the full title)
     let groups = buildGroups(tokens);
-    let r = both(groups);
-    if (r) return pack(r.hits, r.mode, groups, tokens);
+    let hits = runRanked(groups, tokens);
 
-    // 3) typo correction against the real catalog vocabulary
+    // Only use typo correction when the original query produced no result.
     let fixed = null;
-    if (opt.autoCorrect) {
+    if (!hits.length && rules.options.autoCorrect) {
       fixed = correctTokens(tokens);
       if (fixed) {
-        const g2 = buildGroups(fixed);
-        r = both(g2);
-        if (r) return pack(r.hits, 'corrected', g2, fixed, fixed.join(' '));
-        groups = g2; tokens = fixed;
+        const correctedGroups = buildGroups(fixed);
+        const correctedHits = runRanked(correctedGroups, fixed);
+        if (correctedHits.length) {
+          groups = correctedGroups;
+          tokens = fixed;
+          hits = correctedHits;
+          return pack(hits, 'corrected', groups, tokens, fixed.join(' '));
+        }
       }
     }
 
-    // 4) closest: all words but one
-    if (opt.partialMatch && groups.length >= 2) {
-      const min = groups.length - 1;
-      let hits = runPass(groups, 'main', min);
-      if (!hits.length && opt.fallbackToFullTitle) hits = runPass(groups, 'full', min);
-      if (hits.length) return pack(hits, 'partial', groups, tokens, fixed ? fixed.join(' ') : null);
-    }
-    return pack([], 'none', groups, tokens);
+    return pack(hits, hits.length ? 'ranked' : 'none', groups, tokens);
   }
 
   /* ------------------------------------------------------- narrowing chips */
