@@ -169,5 +169,38 @@
       "variant2": [],
       "variant3": []
     }
+  },
+  "search": {
+    "searchFields": [
+      "nama pendek"
+    ],
+    "ranking": {
+      "exactName": 1000,
+      "phraseMatch": 260,
+      "exactToken": 100,
+      "allTokensBonus": 180,
+      "prefixMatch": 48,
+      "typoMatch": 24,
+      "technicalDimensionMatch": 900
+    },
+    "dimensionMatching": {
+      "enabled": true,
+      "metricBolt": {
+        "threadFormat": "M<number>",
+        "lengthUnit": "mm",
+        "requireProductFamily": "baut",
+        "threadAndLengthOrderSensitive": true
+      },
+      "coupling": {
+        "unit": "mm",
+        "dimensionOrderIndependent": true,
+        "requireAllDimensions": true
+      }
+    },
+    "typoTolerance": {
+      "enabled": true,
+      "maxDistance": 1,
+      "minimumTokenLength": 4
+    }
   }
 }
