@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="Centi product price lookup and order builder">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <title>Centi Catalog</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">C</div><div><strong>CENTI CATALOG</strong><small>Price lookup & order builder</small></div></div>
+    <button id="cartTop" class="cart-top" aria-label="Open cart">Cart <span id="cartCount">0</span></button>
+  </header>
+  <main>
+    <section class="search-area">
+      <label class="searchbox"><span>⌕</span><input id="searchInput" type="search" placeholder="Search SKU or product name…" autocomplete="off"><button id="clearSearch" aria-label="Clear search">×</button></label>
+      <div class="toolbar"><span id="resultCount">Loading catalog…</span><button id="refreshBtn" class="text-button">↻ Refresh</button></div>
+      <div id="status" class="status">Connecting to product catalog…</div>
+    </section>
+    <section id="productList" class="product-list" aria-live="polite"></section>
+    <div id="emptyState" class="empty hidden"><div class="empty-icon">⌕</div><strong>No products found</strong><span>Try another SKU or product name.</span></div>
+  </main>
+  <nav class="bottom-nav">
+    <button class="nav-active" id="navCatalog"><span>▦</span>Catalog</button>
+    <button id="navCart"><span>🛒</span>Cart <b id="navCartCount">0</b></button>
+  </nav>
+
+  <div id="cartOverlay" class="overlay hidden"></div>
+  <aside id="cartPanel" class="cart-panel" aria-label="Shopping cart" aria-hidden="true">
+    <div class="panel-head"><div><strong>Your order</strong><small id="cartSubtitle">0 different products</small></div><button id="closeCart" class="icon-button" aria-label="Close cart">×</button></div>
+    <div id="cartItems" class="cart-items"></div>
+    <div class="cart-footer">
+      <div class="total-line"><span>Total</span><strong id="cartTotal">Rp0</strong></div>
+      <button id="sendOrder" class="primary-button">Send order to Telegram</button>
+      <button id="copyOrder" class="secondary-button">Copy order text</button>
+      <p class="footnote">Orders are sent to your configured Telegram chat through your Apps Script endpoint.</p>
+    </div>
+  </aside>
+  <div id="settingsOverlay" class="overlay hidden"></div>
+  <section id="settingsPanel" class="settings-panel hidden">
+    <div class="panel-head"><strong>Connection settings</strong><button id="closeSettings" class="icon-button">×</button></div>
+    <label>Apps Script Web App URL<input id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
+    <label>Order access PIN<input id="orderPin" type="password" inputmode="numeric" placeholder="PIN configured in Apps Script"></label>
+    <button id="saveSettings" class="primary-button">Save settings</button>
+    <p class="footnote">The catalog is public. The PIN is used only to protect Telegram order submission. Do not put your Telegram bot token in this website.</p>
+  </section>
+  <button id="settingsButton" class="settings-fab" aria-label="Settings">⚙</button>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
