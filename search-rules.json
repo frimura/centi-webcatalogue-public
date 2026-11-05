@@ -1,0 +1,173 @@
+{
+  "aliases": {
+    "insert": [
+      "knurl"
+    ],
+    "nut": [
+      "knurl"
+    ],
+    "knurl": [
+      "insert",
+      "nut"
+    ],
+    "headless": [
+      "tanam"
+    ],
+    "tanam": [
+      "headless"
+    ],
+    "coupling": [
+      "kopling"
+    ],
+    "kopling": [
+      "coupling"
+    ],
+    "rubber": [
+      "karet"
+    ],
+    "karet": [
+      "rubber"
+    ],
+    "din": [
+      "verseng"
+    ],
+    "countersunk": [
+      "verseng"
+    ],
+    "counter": [
+      "verseng"
+    ],
+    "round": [
+      "button"
+    ],
+    "kancing": [
+      "button"
+    ],
+    "wire": [
+      "braided",
+      "sleeve"
+    ],
+    "elemen": [
+      "heater"
+    ],
+    "pemanas": [
+      "heater"
+    ]
+  },
+  "categories": {
+    "pulley": {
+      "keywords": [
+        "pulley",
+        "timing pulley"
+      ],
+      "series": {
+        "gt2": [
+          "gt2",
+          "2gt"
+        ]
+      },
+      "variant1": [
+        "20t",
+        "30t",
+        "40t"
+      ],
+      "variant2": [
+        "5mm",
+        "6mm",
+        "8mm"
+      ],
+      "variant3": []
+    },
+    "corner": {
+      "keywords": [
+        "corner",
+        "bracket",
+        "siku"
+      ],
+      "series": {},
+      "variant1": [
+        "2020",
+        "3030"
+      ],
+      "variant2": [],
+      "variant3": []
+    },
+    "coupling": {
+      "keywords": [
+        "flexible"
+      ],
+      "series": {},
+      "variant1": [],
+      "variant2": [],
+      "variant3": []
+    },
+    "profile aluminium": {
+      "keywords": [
+        "extrusion",
+        "profile",
+        "aluminium"
+      ],
+      "series": {},
+      "variant1": [
+        "2020"
+      ],
+      "variant2": [],
+      "variant3": []
+    },
+    "t nut": {
+      "keywords": [
+        "t nut",
+        "M"
+      ],
+      "series": {},
+      "variant1": [],
+      "variant2": [],
+      "variant3": []
+    },
+    "wiremesh": {
+      "keywords": [
+        "sleeve",
+        "braid",
+        "mesh"
+      ],
+      "series": {},
+      "variant1": [],
+      "variant2": [],
+      "variant3": []
+    },
+    "Socket": {
+      "keywords": [
+        "socket"
+      ],
+      "series": {},
+      "variant1": [
+        "head"
+      ],
+      "variant2": [],
+      "variant3": []
+    },
+    "ballnose": {
+      "keywords": [
+        "ballnose",
+        "straight bit",
+        "spiral end"
+      ],
+      "series": {},
+      "variant1": [],
+      "variant2": [],
+      "variant3": []
+    },
+    "mur": {
+      "keywords": [
+        "mur",
+        "locknut"
+      ],
+      "series": {},
+      "variant1": [
+        "nut"
+      ],
+      "variant2": [],
+      "variant3": []
+    }
+  }
+}
