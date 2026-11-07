@@ -1,1 +1,34 @@
-{"name":"Centi Catalog","short_name":"Centi Catalog","start_url":"./","display":"standalone","background_color":"#f5f7fb","theme_color":"#111827","description":"Centi product price lookup and order builder","icons":[{"src":"assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+
+{
+  "name": "Centi Store",
+  "short_name": "Centi",
+  "description": "Centi product price lookup and order builder",
+
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+
+  "background_color": "#ffffff",
+  "theme_color": "#8f0010",
+
+  "icons": [
+    {
+      "src": "assets/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
