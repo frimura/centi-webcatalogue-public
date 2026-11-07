@@ -819,8 +819,9 @@ function bindEvents() {
   $('closeCart').onclick = closeCart;
   $('cartOverlay').onclick = closeCart;
 
-  $('sendOrder').onclick = sendOrder;
-  $('copyOrder').onclick = copyOrder;
+$('sendOrder').onclick = sendOrder;
+$('copyOrder').onclick = copyOrder;
+$('emptyCart').onclick = emptyCart;
 
   $('settingsButton').onclick = openSettings;
   $('closeSettings').onclick = closeSettings;
@@ -857,9 +858,12 @@ function initializeApp() {
       console.error('Could not load search rules:', error);
     });
 
-  // Always fetch the latest Google Sheets data on page startup.
-window.addEventListener('pageshow', () => {
-  if (navigator.onLine) {
+  // Fetch the latest catalog on every normal page startup.
+loadCatalog();
+
+// Refresh again only when restored from browser back-forward cache.
+window.addEventListener('pageshow', event => {
+  if (event.persisted && navigator.onLine) {
     loadCatalog({ silent: true });
   }
 });
