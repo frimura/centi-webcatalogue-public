@@ -821,9 +821,22 @@ main {
     padding-left: 76px;
   }
 }
-.brand-logo {
+/* Centi header logo */
+.topbar .brand-logo {
   display: block;
-  width: 150px;
-  height: auto;
+  width: 120px !important;
+  max-width: 42vw;
+  height: auto !important;
+  max-height: 58px;
   object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .topbar .brand-logo {
+    width: 105px !important;
+    max-width: 36vw;
+    max-height: 52px;
+  }
 }
