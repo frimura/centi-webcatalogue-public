@@ -884,13 +884,28 @@ window.addEventListener('pageshow', event => {
   });
 
   // Register the existing service worker.
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(error => {
-        console.warn('Service worker registration failed:', error);
-      });
+  if ('serviceWorker' in navigator) {
+  let refreshing = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+
+    refreshing = true;
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.register('./sw.js')
+    .then(registration => {
+      registration.update();
+
+      setInterval(() => {
+        registration.update();
+      }, 60 * 1000);
+    })
+    .catch(error => {
+      console.error('Service worker registration failed:', error);
     });
-  }
+}
 }
 
 initializeApp();
