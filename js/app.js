@@ -493,9 +493,12 @@ function addToCart(sku) {
     sku: product.sku,
     name: product.short || product.name,
     price: product.price,
+    image: product.image || '',
     qty: 0
   };
 
+  // Keep the image updated if the product is added again.
+  cart[sku].image = product.image || cart[sku].image || '';
   cart[sku].qty++;
 
   saveCart();
@@ -519,42 +522,64 @@ function updateCartBadge() {
   $('navCartCount').textContent = count;
 }
 
+
 function renderCart() {
   const items = cartValues();
 
   $('cartSubtitle').textContent = `${items.length} different products`;
 
   $('cartItems').innerHTML = items.length
-    ? items.map(item => `
-        <div class="cart-row">
-          <div>
-            <strong>${esc(item.name)}</strong>
-            <small>SKU: ${esc(item.sku)} · ${money(item.price)} each</small>
+    ? items.map(item => {
+        // Support older cart entries that were saved before images were added.
+        const product = products.find(p => p.sku === item.sku);
+        const image = item.image || product?.image || '';
 
-            <div class="qty-control">
-              <button data-minus="${esc(item.sku)}">−</button>
+        return `
+          <div class="cart-row">
+            <div class="cart-row-main">
+              ${
+                image
+                  ? `<img
+                      class="cart-product-image"
+                      src="${esc(image)}"
+                      alt="${esc(item.name)}"
+                      loading="lazy"
+                      referrerpolicy="no-referrer"
+                      onerror="this.outerHTML='<div class=&quot;cart-image-placeholder&quot;>▧</div>'"
+                    >`
+                  : `<div class="cart-image-placeholder">▧</div>`
+              }
 
-              <input
-                data-qty="${esc(item.sku)}"
-                type="number"
-                min="1"
-                step="1"
-                value="${item.qty}"
-              >
+              <div class="cart-product-info">
+                <strong>${esc(item.name)}</strong>
+                <small>SKU: ${esc(item.sku)} · ${money(item.price)} each</small>
 
-              <button data-plus="${esc(item.sku)}">＋</button>
+                <div class="qty-control">
+                  <button data-minus="${esc(item.sku)}">−</button>
 
-              <button class="remove-button" data-remove="${esc(item.sku)}">
-                Remove
-              </button>
+                  <input
+                    data-qty="${esc(item.sku)}"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value="${item.qty}"
+                  >
+
+                  <button data-plus="${esc(item.sku)}">＋</button>
+
+                  <button class="remove-button" data-remove="${esc(item.sku)}">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cart-row-price">
+              ${money(item.price * item.qty)}
             </div>
           </div>
-
-          <div class="cart-row-price">
-            ${money(item.price * item.qty)}
-          </div>
-        </div>
-      `).join('')
+        `;
+      }).join('')
     : `
       <div class="empty">
         <strong>Your cart is empty</strong>
@@ -568,6 +593,7 @@ function renderCart() {
 
   $('sendOrder').disabled = !items.length;
   $('copyOrder').disabled = !items.length;
+  $('emptyCart').disabled = !items.length;
 
   $('cartItems').querySelectorAll('[data-minus]').forEach(button => {
     button.onclick = () => changeQty(button.dataset.minus, -1);
