@@ -70,7 +70,52 @@
     }
     return out;
   }
+function expandSameSubgroup(hits) {
+  const matchedSkus = new Set(hits.map(h => h.d.sku));
 
+  // Collect the exact subgroups represented in the search results.
+  const subgroups = new Set(
+    hits
+      .map(h => String(h.d.p.category || '').trim().toUpperCase())
+      .filter(Boolean)
+  );
+
+  if (!subgroups.size) return hits;
+
+  // Find other products in those same subgroups.
+  const related = docs.filter(d => {
+    const subgroup = String(d.p.category || '').trim().toUpperCase();
+
+    return (
+      subgroup &&
+      subgroups.has(subgroup) &&
+      !hideSet.has(d.key) &&
+      !matchedSkus.has(d.sku)
+    );
+  });
+
+  // Keep original ranked matches first, then append related products.
+  const expanded = hits.slice();
+
+  for (const d of related) {
+    matchedSkus.add(d.sku);
+
+    expanded.push({
+      d,
+      score: 0,
+      matched: 0,
+      coverage: 0,
+      categoryMatch: false,
+      exactDimensions: 0,
+      partialDimensions: 0,
+      dimensionMatches: 0,
+      dimensionExact: 0,
+      rank: 'subgroup'
+    });
+  }
+
+  return expanded;
+}
   const RE_SUFFIX = /^(\d+(?:\.\d+)?)([a-z]{0,4})$/;   // 8mm 20t 12v 2020 625zz
   const RE_PREFIX = /^([a-z]{1,4})(\d+(?:\.\d+)?)$/;   // m3 t8 er20 gt2 m2.5
   function parseNum(t) {
@@ -459,7 +504,11 @@
     };
 
     let groups = buildGroups(tokens);
-    let hits = runRanked(groups, tokens);
+let hits = runRanked(groups, tokens);
+
+if (hits.length) {
+  hits = expandSameSubgroup(hits);
+}
 
     // Only use typo correction when the original query produced no result.
     let fixed = null;
@@ -467,13 +516,17 @@
       fixed = correctTokens(tokens);
       if (fixed) {
         const correctedGroups = buildGroups(fixed);
-        const correctedHits = runRanked(correctedGroups, fixed);
-        if (correctedHits.length) {
-          groups = correctedGroups;
-          tokens = fixed;
-          hits = correctedHits;
-          return pack(hits, 'corrected', groups, tokens, fixed.join(' '));
-        }
+let correctedHits = runRanked(correctedGroups, fixed);
+
+if (correctedHits.length) {
+  correctedHits = expandSameSubgroup(correctedHits);
+
+  groups = correctedGroups;
+  tokens = fixed;
+  hits = correctedHits;
+
+  return pack(hits, 'corrected', groups, tokens, fixed.join(' '));
+}
       }
     }
 
