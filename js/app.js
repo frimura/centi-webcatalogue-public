@@ -884,8 +884,10 @@ window.addEventListener('pageshow', event => {
   });
 
   // Register the existing service worker.
-  if ('serviceWorker' in navigator) {
+ 
+if ('serviceWorker' in navigator) {
   let refreshing = false;
+  let swRegistration;
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
@@ -894,18 +896,45 @@ window.addEventListener('pageshow', event => {
     window.location.reload();
   });
 
-  navigator.serviceWorker.register('./sw.js')
-    .then(registration => {
-      registration.update();
+  async function checkForUpdates() {
+    if (!navigator.onLine || !swRegistration) return;
 
-      setInterval(() => {
-        registration.update();
-      }, 60 * 1000);
+    try {
+      await swRegistration.update();
+    } catch (error) {
+      console.log('Update check failed:', error);
+    }
+  }
+
+  navigator.serviceWorker.register('./sw.js', {
+    updateViaCache: 'none'
+  })
+    .then(registration => {
+      swRegistration = registration;
+      checkForUpdates();
+
+      // Periodic check while the page is active.
+      setInterval(checkForUpdates, 60 * 1000);
+
+      // Check whenever the visitor returns.
+      window.addEventListener('pageshow', checkForUpdates);
+      window.addEventListener('focus', checkForUpdates);
+
+      // Check when the app becomes visible again.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          checkForUpdates();
+        }
+      });
+
+      // Check after internet connection returns.
+      window.addEventListener('online', checkForUpdates);
     })
     .catch(error => {
       console.error('Service worker registration failed:', error);
     });
 }
+
 }
 
 initializeApp();
