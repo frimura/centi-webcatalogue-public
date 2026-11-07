@@ -509,35 +509,11 @@
   }
 
   // suggestions that split the current result list (sizes, families, colours ...)
-  function refine(res) {
-    const max = rules.options.maxChips || 14;
-    if (!res || res.mode === 'none' || res.mode === 'sku' || res.items.length < 6) return [];
-    const items = res.items.slice(0, 800);
-    const n = items.length;
+  
+function refine() {
+  return [];
+}
 
-    const pinned = categoryChips(res, items).slice(0, Math.ceil(max / 2));
-    const taken = new Set(pinned.map(c => c.add));
-
-    const df = new Map();
-    for (const p of items) {
-      const d = docOf.get(p);
-      if (!d) continue;
-      for (const t of d.main.set) if (!res.skip.has(t)) df.set(t, (df.get(t) || 0) + 1);
-    }
-    const cands = [];
-    for (const [t, c] of df) {
-      if (t.length < 2 || c < 2 || c > n * 0.9 || chipStop.has(t) || taken.has(t)) continue;
-      cands.push({ t, s: Math.min(c, n - c) });
-    }
-    cands.sort((a, b) => (b.s - a.s) || collator.compare(a.t, b.t));
-
-    const rem = max - pinned.length;
-    const words = cands.filter(c => !/\d/.test(c.t));
-    const sizes = cands.filter(c => /\d/.test(c.t));
-    const ws = words.slice(0, Math.max(Math.ceil(rem / 2), rem - sizes.length));
-    const zs = sizes.slice(0, rem - ws.length);
-    return pinned.concat(ws, zs).map(c => ({ label: c.label || pretty(c.t), add: c.add || c.t }));
-  }
 
   return {
     setRules, loadRules, index, ensure, search, browse, count, refine,
