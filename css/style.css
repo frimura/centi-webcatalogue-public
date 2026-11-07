@@ -821,3 +821,9 @@ main {
     padding-left: 76px;
   }
 }
+.brand-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
