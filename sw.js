@@ -9,7 +9,10 @@ const FILES = [
   './js/search.js',
   './search-rules.json',
   './manifest.json',
-  './assets/icon.svg'
+  './assets/icon.svg',
+  './assets/centi-logo.png',
+'./assets/app-icon-192.png',
+'./assets/app-icon-512.png',
 ];
 
 // Install the new service worker.
