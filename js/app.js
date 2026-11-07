@@ -630,7 +630,17 @@ function changeQty(sku, difference) {
 
   saveCart();
 }
+function emptyCart() {
+  if (!cartValues().length) return;
 
+  if (!confirm('Are you sure you want to remove all products from your cart?')) {
+    return;
+  }
+
+  cart = {};
+  saveCart();
+  showToast('Cart emptied');
+}
 
 /* =========================================================
    10. ORDER GENERATION AND TELEGRAM
