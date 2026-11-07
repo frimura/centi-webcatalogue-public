@@ -821,8 +821,12 @@ function initializeApp() {
       console.error('Could not load search rules:', error);
     });
 
-  // Fetch fresh data on every startup.
-  loadCatalog();
+  // Always fetch the latest Google Sheets data on page startup.
+window.addEventListener('pageshow', () => {
+  if (navigator.onLine) {
+    loadCatalog({ silent: true });
+  }
+});
 
   // Refresh the catalog every five minutes.
   startAutomaticRefresh();
